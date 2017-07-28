@@ -10,8 +10,10 @@ require 'etc'
 
 ncpus = Etc.nprocessors
 puts "Available #{ncpus} processors, consider tweaking $thr_n and $thr_m accordingly"
+# If You have a powerful network, then prefer to put all CPU power to $thr_n
+# For example $thr_n = 48, $thr_m = 1 - will be fastest with 48 CPUs/cores.
 $thr_n = 48  # Number of threads to process separate hours in parallel
-$thr_m = 1  # Number of threads to process separate JSON events in parallel
+$thr_m = 1   # Number of threads to process separate JSON events in parallel
 
 def repo_hit(data, forg, frepo)
   unless data
@@ -50,21 +52,29 @@ def get_gha_json(dt, forg, frepo)
     thr_pool = []
     jsons = jsons.split("\n")
     puts "Splitted: #{fn}"
-    jsons.each do |json|
-      n += 1
-      thr = Thread.new(json) { |ajson| threaded_parse(ajson, dt, forg, frepo) }
-      thr_pool << thr
-      if thr_pool.length == $thr_m
-        thr_pool.each do |thr|
+    if $thr_m > 1
+      jsons.each do |json|
+        n += 1
+	# This was passing copy of local `json` to the Thread - but proved unnecessary.
+        # thr = Thread.new(json) { |ajson| threaded_parse(ajson, dt, forg, frepo) }
+        thr = Thread.new { threaded_parse(json, dt, forg, frepo) }
+        thr_pool << thr
+        if thr_pool.length == $thr_m
+          thr = thr_pool.first
           thr.join
           f += thr.value
+          thr_pool = thr_pool[1..-1]
         end
-        thr_pool = []
       end
-    end
-    thr_pool.each do |thr|
-      thr.join
-      f += thr.value
+      thr_pool.each do |thr|
+        thr.join
+        f += thr.value
+      end
+    else
+      jsons.each do |json|
+        n += 1
+        f += threaded_parse(json, dt, forg, frepo)
+      end
     end
   end
   puts "Parsed: #{fn}: #{n} JSONs, found #{f} matching"
@@ -79,17 +89,25 @@ def gha2pg(args)
   repo = args[5] || ''
   puts "Running: #{d_from} - #{d_to} #{org}/#{repo}"
   dt = d_from
-  thr_pool = []
-  while dt <= d_to
-    thr = Thread.new(dt) { |adt| get_gha_json(adt, org, repo) }
-    thr_pool << thr
-    dt = dt + 3600
-    if thr_pool.length == $thr_n
-      thr_pool.each { |thr| thr.join }
-      thr_pool = []
+  if $thr_n > 1
+    thr_pool = []
+    while dt <= d_to
+      thr = Thread.new(dt) { |adt| get_gha_json(adt, org, repo) }
+      thr_pool << thr
+      dt = dt + 3600
+      if thr_pool.length == $thr_n
+        thr = thr_pool.first
+        thr.join
+        thr_pool = thr_pool[1..-1]
+      end
+    end
+    thr_pool.each { |thr| thr.join }
+  else
+    while dt <= d_to
+      get_gha_json(dt, org, repo)
+      dt = dt + 3600
     end
   end
-  thr_pool.each { |thr| thr.join }
   puts "All done."
 end
 
