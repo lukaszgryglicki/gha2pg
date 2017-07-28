@@ -43,6 +43,14 @@ $thr_n = 4  # Number of threads to process separate hours in parallel
 $thr_m = 4  # Number of threads to process separate JSON events in parallel
 ```
 
+# Results
+Usually there are about 40000 GitHub events in single hour.
+Running this program on a 5 days of data with org=kubernetes (and no repo set - which means all kubernetes repos) takes: 10 minutes 50 seconds.
+Generates 12002 JSONs in `jsons/` directory with summary size 165 Mb (each JSON is a single GitHub event).
+To do so it processes about 21 Gb of data.
+XZipped file: `kubernetes_events.tar.xz`.
+
+
 # Future
 Next plan is to create PostgreSQL database and save matching JSONs there.
 
