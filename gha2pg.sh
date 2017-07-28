@@ -1,2 +1,2 @@
 #!/bin/sh
-./gha2pg.rb 2017-07-28 3 2017-07-28 5 lukaszgryglicki dn
+./gha2pg.rb 2017-07-28 00 2017-07-28 06 lukaszgryglicki dn

@@ -6,6 +6,9 @@ require 'open-uri'
 require 'zlib'
 require 'stringio'
 require 'json'
+  
+$thr_n = 4  # Number of threads to process separate hours in parallel
+$thr_m = 4  # Number of threads to process separate JSON events in parallel
 
 def repo_hit(data, forg, frepo)
   unless data
@@ -18,23 +21,43 @@ def repo_hit(data, forg, frepo)
   true
 end
 
+def threaded_parse(json, dt, forg, frepo)
+  h = JSON.parse json
+  f = 0
+  full_name = h['repo']['name']
+  if repo_hit(full_name, forg, frepo)
+    eid = h['id']
+    prt = JSON.pretty_generate(h)
+    ofn = "jsons/#{dt.to_i}_#{eid}.json"
+    File.write ofn, prt
+    puts "Written: #{ofn}"
+    f = 1
+  end
+  return f
+end
+
 def get_gha_json(dt, forg, frepo)
   fn = dt.strftime('http://data.githubarchive.org/%Y-%m-%d-%k.json.gz').sub(' ', '')
+  puts "Working on: #{fn}"
   n = f = 0
   open(fn, 'rb') do |json_tmp_file|
     jsons = Zlib::GzipReader.new(json_tmp_file).read
+    thr_pool = []
     jsons.split("\n").each do |json|
-      h = JSON.parse json
-      full_name = h['repo']['name']
       n += 1
-      if repo_hit(full_name, forg, frepo)
-        eid = h['id']
-        prt = JSON.pretty_generate(h)
-        ofn = "jsons/#{dt.to_i}_#{eid}.json"
-        File.write ofn, prt
-        puts "Written: #{ofn}"
-        f += 1
+      thr = Thread.new(json) { |ajson| threaded_parse(ajson, dt, forg, frepo) }
+      thr_pool << thr
+      if thr_pool.length == $thr_m
+        thr_pool.each do |thr|
+          thr.join
+          f += thr.value
+        end
+        thr_pool = []
       end
+    end
+    thr_pool.each do |thr|
+      thr.join
+      f += thr.value
     end
   end
   puts "#{fn}: parsed #{n} JSONs, found #{f} matching"
@@ -47,13 +70,19 @@ def gha2pg(args)
   d_to = parsed_time = DateTime.strptime("#{args[2]} #{args[3]}:00:00+00:00", '%Y-%m-%d %H:%M:%S%z').to_time
   org = args[4] || ''
   repo = args[5] || ''
-  # puts "#{d_from} - #{d_to} #{org}/#{repo}"
+  puts "#{d_from} - #{d_to} #{org}/#{repo}"
   dt = d_from
+  thr_pool = []
   while dt <= d_to
-    # puts dt
-    get_gha_json(dt, org, repo)
+    thr = Thread.new(dt) { |adt| get_gha_json(adt, org, repo) }
+    thr_pool << thr
     dt = dt + 3600
+    if thr_pool.length == $thr_n
+      thr_pool.each { |thr| thr.join }
+      thr_pool = []
+    end
   end
+  thr_pool.each { |thr| thr.join }
 end
 
 if ARGV.length < 4
