@@ -22,6 +22,9 @@ You can filter only by repo, You need to pass '' as org and then repo name.
 You can return all JSONs byb skipping both params.
 You can provide both to observe only events from given org/repo.
 
+Example script that queries for all events from org=`kubernetes` for 5 days:
+`./gha2pg.sh`
+
 GitHub archives keeps data as Gzipped JSONs for each hour (24 gzipped JSONs per day).
 Single JSON is not a real JSON file, but "\n" newline separated list of JSONs for each GitHub event in that hour.
 So this is a JSON array in reality.
