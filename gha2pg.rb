@@ -6,9 +6,12 @@ require 'open-uri'
 require 'zlib'
 require 'stringio'
 require 'json'
-  
-$thr_n = 4  # Number of threads to process separate hours in parallel
-$thr_m = 4  # Number of threads to process separate JSON events in parallel
+require 'etc'
+
+ncpus = Etc.nprocessors
+puts "Available #{ncpus} processors, consider tweaking $thr_n and $thr_m accordingly"
+$thr_n = 48  # Number of threads to process separate hours in parallel
+$thr_m = 1  # Number of threads to process separate JSON events in parallel
 
 def repo_hit(data, forg, frepo)
   unless data
@@ -41,9 +44,13 @@ def get_gha_json(dt, forg, frepo)
   puts "Working on: #{fn}"
   n = f = 0
   open(fn, 'rb') do |json_tmp_file|
+    puts "Opened: #{fn}"
     jsons = Zlib::GzipReader.new(json_tmp_file).read
+    puts "Decompressed: #{fn}"
     thr_pool = []
-    jsons.split("\n").each do |json|
+    jsons = jsons.split("\n")
+    puts "Splitted: #{fn}"
+    jsons.each do |json|
       n += 1
       thr = Thread.new(json) { |ajson| threaded_parse(ajson, dt, forg, frepo) }
       thr_pool << thr
@@ -60,7 +67,7 @@ def get_gha_json(dt, forg, frepo)
       f += thr.value
     end
   end
-  puts "#{fn}: parsed #{n} JSONs, found #{f} matching"
+  puts "Parsed: #{fn}: #{n} JSONs, found #{f} matching"
 rescue OpenURI::HTTPError => e
   puts "No data yet for #{dt}"
 end
@@ -70,7 +77,7 @@ def gha2pg(args)
   d_to = parsed_time = DateTime.strptime("#{args[2]} #{args[3]}:00:00+00:00", '%Y-%m-%d %H:%M:%S%z').to_time
   org = args[4] || ''
   repo = args[5] || ''
-  puts "#{d_from} - #{d_to} #{org}/#{repo}"
+  puts "Running: #{d_from} - #{d_to} #{org}/#{repo}"
   dt = d_from
   thr_pool = []
   while dt <= d_to
@@ -83,6 +90,7 @@ def gha2pg(args)
     end
   end
   thr_pool.each { |thr| thr.join }
+  puts "All done."
 end
 
 if ARGV.length < 4
