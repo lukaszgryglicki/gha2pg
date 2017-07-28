@@ -35,6 +35,14 @@ N_ID.json where:
 
 Once saved, You can review those JSONs manually (they''re pretty printed)
 
+# Mutithreading (for example cncftest.io server has 48 CPU cores):
+
+Set those Ruby variables:
+```
+$thr_n = 4  # Number of threads to process separate hours in parallel
+$thr_m = 4  # Number of threads to process separate JSON events in parallel
+```
+
 # Future
 Next plan is to create PostgreSQL database and save matching JSONs there.
 
