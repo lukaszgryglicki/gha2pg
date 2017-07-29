@@ -3,10 +3,61 @@
 require 'json'
 require 'pry'
 
+def object_structure(s, o, is=false, md=nil, d=0)
+  case o
+  when Hash
+    if !md || d < md
+      s += '{'
+      o.keys.sort.each do |k|
+        v = o[k]
+        s += k.to_s + ':' + object_structure('', v, is, md, d + 1)
+        s += ','
+      end
+      s = s[0..-2] + '}'
+    else
+      s += '{}'
+    end
+  when Array
+    if !md || d < md
+      v = o.first
+      s += '[' + object_structure('', v, is, md, d + 1) + ']'
+      nd = o.map(&:class).uniq.count
+      if nd >= 2
+        puts "Non unique type array elements"
+        p o
+        binding.pry
+      end
+    else
+      s += '[]'
+    end
+  when NilClass
+    s += '(nil)' unless is
+  when TrueClass, FalseClass
+    s += '(bool)' unless is
+  when String
+    s += '(string)' unless is
+  when Symbol
+    s += '(symbol)' unless is
+  when Fixnum
+    s += '(fixnum)' unless is
+  when Bignum
+    s += '(bignum)' unless is
+  when Float
+    s += '(float)' unless is
+  when Time, Date, DateTime
+    s += '(dt)' unless is
+  else
+    puts "Unknown class #{o.class}"
+    exit 1
+  end
+  s
+end
+
 def analysis(jsons)
   n = 0
   occ = {}
   ml = {}
+  strs = {}
   jsons.each do |json|
     h = JSON.parse(File.read(json)).to_h
     # Leave h "as is" to investigate top level DB table
@@ -15,9 +66,10 @@ def analysis(jsons)
     # h = h['org']        # Investigate gha_orgs table
     h = h['payload']    # Investigate gha_payloads table (most complex)
     next unless h
-    h = h['pages']
-    next unless h
-    h = h.first
+    # h = h['issue']
+    # next unless h
+    s = object_structure('', h, true, 1)
+    strs[s] = h
 
     # Analysis
     keys = h.keys
@@ -36,6 +88,7 @@ def analysis(jsons)
   p occ
   p ml
   p n
+  binding.pry if strs.keys.length > 1
 end
 
 analysis(ARGV)

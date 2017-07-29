@@ -84,6 +84,18 @@ PostgreSQL (wip):
 - Creates 367K rows in `gha_actors` table.
 - Creates 438K rows in `gha_repos` table.
 
+Running on all `kubernetes` repos for June 2017 yields:
+- Takes: 66 minutes 24 seconds.
+- Creates 4429 actors.
+- Creates 4288 commits.
+- Creates 60722 events.
+- Creates 1 org.
+- Creates 30 pages.
+- Creates 58357 payloads.
+- Creates 41 repos.
+- Creates 4953 payload - commit connections.
+- Creates 30 payloads - pages connections.
+
 
 # PostgreSQL database
 Setup:
@@ -111,8 +123,12 @@ Defaults are:
 Typical internal usage: 
 `time PG_PASS=your_password ./structure.rb`
 
+# JSON structure analysis tool
 There is also an internal tool: `analysis.rb`/`analysis.sh` to figure out how to create psql tables for gha.
 But this is only useful while developing this tool.
+
+This tool can generate all possible distinct structures of any key at any depths, to see possible veriants of this key.
+It is used very intensively during development of PSQL table structure.
 
 # Running on Kubernetes
 

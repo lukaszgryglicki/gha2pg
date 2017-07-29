@@ -316,8 +316,8 @@ def repo_hit(data, forg, frepo)
     return false
   end
   org, repo = *data.split('/')
-  return false unless forg == '' || forg.include?(org)
-  return false unless frepo == '' || frepo.include?(repo)
+  return false unless forg.length == 0 || forg.include?(org)
+  return false unless frepo.length == 0 || frepo.include?(repo)
   true
 end
 
