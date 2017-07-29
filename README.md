@@ -13,7 +13,7 @@ Next two parameters are date to:
 - YYYY-MM-DD
 - HH
 
-Both next two parameters are optional.
+Both next two parameters are optional:
 - org (if given and non empty '' then only return JSONs matching given org)
 - repo (if given and non empty '' then only return JSONs matching given repo)
 
@@ -22,8 +22,17 @@ You can filter only by repo, You need to pass '' as org and then repo name.
 You can return all JSONs by skipping both params.
 You can provide both to observe only events from given org/repo.
 
-Example script that queries for all events from org=`kubernetes` for 5 days:
-`./gha2pg.sh`
+# Configuration
+
+You can tweak `gha2pg.rb` by:
+
+- Set `$db_out = true` if You want to put int PSQL DB.
+- Set `$json_out = true` to save output JSON files.
+
+Examples in this shell script (some commented out, some not):
+`time PG_PASS=your_pass ./gha2pg.sh`
+
+# Informations
 
 GitHub archives keeps data as Gzipped JSONs for each hour (24 gzipped JSONs per day).
 Single JSON is not a real JSON file, but "\n" newline separated list of JSONs for each GitHub event in that hour.
@@ -31,7 +40,7 @@ So this is a JSON array in reality.
 
 We download this gzipped JSON, process it on the fly, creating array of JSON events and
 then each single event JSON matching org/repo criteria is saved in `jsons` directory as
-N_ID.json where:
+`N_ID.json` where:
 - N - given GitHub archive''s JSON hour as UNIX timestamp
 - ID - GitHub event ID
 
@@ -41,9 +50,13 @@ Once saved, You can review those JSONs manually (they''re pretty printed)
 
 For example cncftest.io server has 48 CPU cores.
 It will just process 48 hours in parallel.
+It detects number of available CPUs automatically.
 
 # Results
-Usually there are about 40000 GitHub events in single hour.
+
+JSON:
+Usually there are about 25000 GitHub events in single hour in Jan 2017 (for July 2017 it is 40000).
+Average seems to be from 15000 to 50000.
 Running this program on a 5 days of data with org `kubernetes` (and no repo set - which means all kubernetes repos).
 
 - Takes: 10 minutes 50 seconds.
@@ -62,6 +75,13 @@ June 2017:
 Taking all event from single day is 5 minutes 50 seconds (2017-07-28):
 - Generates 1194599 JSON files (1.2M)
 - Takes 7 Gb of disck space
+
+PostgreSQL (wip):
+- Processing on 48 CPUS with all events for 3 days (1st, 2nd, 3rd Jan 2017):
+- Takes 28 minutes 30 seconds.
+- Creases 2,13M rows in `gha_events` table (DB is `gha`).
+- Creates 367K rows in `gha_actors` table.
+- Creates 438K rows in `gha_repos` table.
 
 
 # PostgreSQL database
@@ -88,13 +108,12 @@ Defaults are:
 - Database password: PG_PASS || 'password'
 
 Typical internal usage: 
-`PG_PASS=your_password ./structure.rb`
-
+`time PG_PASS=your_password ./structure.rb`
 
 There is also an internal tool: `analysis.rb`/`analysis.sh` to figure out how to create psql tables for gha.
 But this is only useful while developing this tool.
 
 
 # Future
-Next plan is to create PostgreSQL database and save matching JSONs there.
+Plan is to finish PostgreSQL database support and save matching JSONs there.
 

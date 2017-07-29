@@ -11,7 +11,13 @@ require 'pg'
 
 $thr_n = Etc.nprocessors
 puts "Available #{$thr_n} processors"
+
+# Set $debug = true to see output for all events generated
+# Set $json_out to save output JSON file
+# Set $db_out = true if You want to put int PSQL DB
 $debug = false
+$json_out = false
+$db_out = true
 
 # DB setup:
 # apt-get install postgresql
@@ -70,7 +76,7 @@ def process_table(con, sid, stmts, argss, retr=0)
   res
 rescue PG::UniqueViolation => e
   con.exec('deallocate ' + sid)
-  puts "UNIQUE violation #{e.message}"
+  # puts "UNIQUE violation #{e.message}"
   exit(1) if retr >= 1
   return process_table(con, sid, stmts, argss, retr + 1)
 end
@@ -165,18 +171,20 @@ def threaded_parse(con, json, dt, forg, frepo)
   full_name = h['repo']['name']
   if repo_hit(full_name, forg, frepo)
     eid = h['id']
-    prt = JSON.pretty_generate(h)
-    ofn = "jsons/#{dt.to_i}_#{eid}.json"
-    File.write ofn, prt
-    puts "Written: #{ofn}" if $debug
-    write_to_pg(con, h)
+    if $json_out
+      prt = JSON.pretty_generate(h)
+      ofn = "jsons/#{dt.to_i}_#{eid}.json"
+      File.write ofn, prt 
+    end
+    write_to_pg(con, h) if $db_out
+    puts "Processed: '#{dt}' event: #{eid}" if $debug
     f = 1
   end
   return f
 end
 
 # This is a work for single thread - 1 hour of GHA data
-# Usually such JSON conatin about 40000 singe events
+# Usually such JSON conatin about 20000 - 50000 singe events
 def get_gha_json(dt, forg, frepo)
   con = connect_db
   fn = dt.strftime('http://data.githubarchive.org/%Y-%m-%d-%k.json.gz').sub(' ', '')
