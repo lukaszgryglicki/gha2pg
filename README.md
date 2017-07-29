@@ -19,7 +19,7 @@ Both next two parameters are optional.
 
 You can filter only by org by passing for example 'kubernetes' for org and '' for repo or skipping repo.
 You can filter only by repo, You need to pass '' as org and then repo name.
-You can return all JSONs byb skipping both params.
+You can return all JSONs by skipping both params.
 You can provide both to observe only events from given org/repo.
 
 Example script that queries for all events from org=`kubernetes` for 5 days:
@@ -66,6 +66,41 @@ June 2017:
 - Generates 60773 JSONs in `jsons/` directory with summary size 815 Mb (each JSON is a single GitHub event).
 - To do so it processes about 126 Gb of data.
 - XZipped file: `k8s_month.tar.xz`.
+
+Taking all event from single day is 5 minutes 50 seconds (2017-07-28):
+- Generates 1194599 JSON files (1.2M)
+- Takes 7 Gb of disck space
+
+
+# PostgreSQL database
+Setup:
+
+Ubuntu like Linux:
+
+- apt-get install postgresql 
+- sudo -i -u postgres
+- psql
+- create database gha;
+- create user gha_admin with password 'your_password_here';
+- grant all privileges on database "gha" to gha_admin;
+- ./structure.rb
+
+`structure.rb` script is used to create Postgres database schema.
+It gets connection details from environmental variables and falls back to some defaults.
+
+Defaults are:
+- Database host: environment variable PG_HOST or `localhost`
+- Database port: PG_PORT or 5432
+- Database name: PG_DB or 'gha'
+- Database user: PG_USER or 'gha_admin'
+- Database password: PG_PASS || 'password'
+
+Typical internal usage: 
+`PG_PASS=your_password ./structure.rb`
+
+
+There is also an internal tool: `analysis.rb`/`analysis.sh` to figure out how to create psql tables for gha.
+But this is only useful while developing this tool.
 
 
 # Future
