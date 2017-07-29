@@ -11,11 +11,13 @@ require 'pg'
 
 $thr_n = Etc.nprocessors
 puts "Available #{$thr_n} processors"
+# $thr_n = 1 # You can use ST version for debugging if needed
 
-# Set $debug = true to see output for all events generated
+# Set $debug = 1 to see output for all events generated
+# Set $debug = 2 to see database queries
 # Set $json_out to save output JSON file
 # Set $db_out = true if You want to put int PSQL DB
-$debug = false
+$debug = 0
 $json_out = false
 $db_out = true
 
@@ -42,11 +44,20 @@ def connect_db
     user: ENV['PG_USER'] || 'gha_admin',
     password: ENV['PG_PASS'] || 'password'
   ).tap do |con|
-    con.exec 'set session characteristics as transaction isolation level repeatable read'
+    # con.exec 'set session characteristics as transaction isolation level repeatable read'
   end
 rescue PG::Error => e
   puts e.message
   exit(1)
+end
+
+# returns for n:
+# n=1 -> values($1)
+# n=10 -> values($1, $2, $3, .., $10)
+def n_values(n)
+  s = 'values('
+  (1..n).each { |i| s += "$#{i}, " }
+  s[0..-3] + ')'
 end
 
 # Create prepared statement, bind args, execute and destroy statement
@@ -54,6 +65,7 @@ end
 # it is called without transaction on `gha_events` table but *ONLY* because each JSON in GHA
 # is a separate/unique GH event, so can be processed without concurency check at all
 def exec_stmt(con, sid, stmt, args)
+  p [sid, stmt, args] if $debug >= 2
   con.prepare sid, stmt
   con.exec_prepared(sid, args).tap do
     con.exec('deallocate ' + sid)
@@ -85,7 +97,7 @@ end
 def write_to_pg(con, ev)
   sid = 'stmt' + Thread.current.object_id.to_s
   # gha_events
-  # {"id:String"=>48592, "type:String"=>48592, "actor:Hash"=>48592, "repo:Hash"=>48592, "payload:Hash"=>48592, "public:TrueClass"=>48592, "created_at:String"=>48592, "org:Hash"=>19451}i#
+  # {"id:String"=>48592, "type:String"=>48592, "actor:Hash"=>48592, "repo:Hash"=>48592, "payload:Hash"=>48592, "public:TrueClass"=>48592, "created_at:String"=>48592, "org:Hash"=>19451}
   # {"id"=>10, "type"=>29, "actor"=>278, "repo"=>290, "payload"=>216017, "public"=>4, "created_at"=>20, "org"=>230}
   eid = ev['id'].to_i
   rs = exec_stmt(con, sid, 'select 1 from gha_events where id=$1', [eid])
@@ -150,6 +162,151 @@ def write_to_pg(con, ev)
       ]
     ]
   )
+
+  # gha_orgs
+  # {"id:Fixnum"=>18494, "login:String"=>18494, "gravatar_id:String"=>18494, "url:String"=>18494, "avatar_url:String"=>18494}
+  # {"id"=>8, "login"=>38, "gravatar_id"=>0, "url"=>66, "avatar_url"=>49}
+  org = ev['org']
+  if org
+    oid = org['id'].to_i
+    process_table(
+      con,
+      sid,
+      [
+        'select 1 from gha_orgs where id=$1', 
+        'insert into gha_orgs(id, login) ' +
+        'values($1, $2)'
+      ],
+      [
+        [oid],
+        [
+          oid,
+          org['login']
+        ]
+      ]
+    )
+  end
+
+  # gha_payloads
+  # {"push_id:Fixnum"=>24636, "size:Fixnum"=>24636, "distinct_size:Fixnum"=>24636, "ref:String"=>30522, "head:String"=>24636, "before:String"=>24636, "commits:Array"=>24636, "action:String"=>14317, "issue:Hash"=>6446, "comment:Hash"=>6055, "ref_type:String"=>8010, "master_branch:String"=>6724, "description:String"=>3701, "pusher_type:String"=>8010, "pull_request:Hash"=>4475, "ref:NilClass"=>2124, "description:NilClass"=>3023, "number:Fixnum"=>2992, "forkee:Hash"=>1211, "pages:Array"=>370, "release:Hash"=>156, "member:Hash"=>219}
+  # {"push_id"=>10, "size"=>4, "distinct_size"=>4, "ref"=>110, "head"=>40, "before"=>40, "commits"=>33215, "action"=>9, "issue"=>87776, "comment"=>177917, "ref_type"=>10, "master_branch"=>34, "description"=>3222, "pusher_type"=>4, "pull_request"=>70565, "number"=>5, "forkee"=>6880, "pages"=>855, "release"=>31206, "member"=>1040}
+  # 48746
+  pl = ev['payload']
+  plid = pl.hash
+  process_table(
+    con,
+    sid,
+    [
+      'select 1 from gha_payloads where id=$1',
+      'insert into gha_payloads(' +
+      'id, push_id, size, ref, head, before, action, ' +
+      'issue_id, comment_id, ref_type, master_branch, ' +
+      'description, number, forkee_id, release_id, member_id' +
+      ') ' + n_values(16)
+    ],
+    [
+      [plid],
+      [
+        plid,
+        pl['push_id'],
+        pl['size'],
+        pl['ref'],
+        pl['head'],
+        pl['before'],
+        pl['action'],
+        pl['issue'] ? pl['issue']['id'] : nil,
+        pl['comment'] ? pl['comment']['id'] : nil,
+        pl['ref_type'],
+        pl['master_branch'],
+        pl['description'],
+        pl['number'],
+        pl['forkee'] ? pl['forkee']['id'] : nil,
+        pl['release'] ? pl['release']['id'] : nil,
+        pl['member'] ? pl['member']['id'] : nil
+      ]
+    ]
+  )
+
+  # gha_commits
+  # {"sha:String"=>23265, "author:Hash"=>23265, "message:String"=>23265, "distinct:TrueClass"=>21789, "url:String"=>23265, "distinct:FalseClass"=>1476}
+  # {"sha"=>40, "author"=>177, "message"=>19005, "distinct"=>5, "url"=>191}
+  # author: {"name:String"=>23265, "email:String"=>23265} (only git username/email)
+  # author: {"name"=>96, "email"=>95}
+  # 23265
+  commits = ev['payload']['commits'] || []
+  commits.each do |commit|
+    sha = commit['sha']
+    process_table(
+      con,
+      sid,
+      [
+        'select 1 from gha_commits where sha=$1',
+        'insert into gha_commits(' +
+        'sha, author_name, author_email, message, is_distinct) ' +
+        'values($1, $2, $3, $4, $5)'
+      ],
+      [
+        [sha],
+        [
+          sha,
+          commit['author']['name'],
+          commit['author']['email'],
+          commit['message'],
+          commit['distinct']
+        ]
+      ]
+    )
+    process_table(
+      con,
+      sid,
+      [
+        'select 1 from gha_payloads_commits where payload_id=$1 and sha=$2',
+        'insert into gha_payloads_commits(payload_id, sha) values($1, $2)'
+      ],
+      [
+        [plid, sha],
+        [plid, sha]
+      ]
+    )
+  end
+
+  # gha_pages
+  # {"page_name:String"=>370, "title:String"=>370, "summary:NilClass"=>370, "action:String"=>370, "sha:String"=>370, "html_url:String"=>370}
+  # {"page_name"=>65, "title"=>65, "summary"=>0, "action"=>7, "sha"=>40, "html_url"=>130}
+  # 370
+  pages = ev['payload']['pages'] || []
+  pages.each do |page|
+    sha = page['sha']
+    process_table(
+      con,
+      sid,
+      [
+        'select 1 from gha_pages where sha=$1',
+        'insert into gha_pages(sha, action, page_name, title) values($1, $2, $3, $4)'
+      ],
+      [
+        [sha],
+        [
+          sha,
+          page['action'],
+          page['page_name'],
+          page['title']
+        ]
+      ]
+    )
+    process_table(
+      con,
+      sid,
+      [
+        'select 1 from gha_payloads_pages where payload_id=$1 and sha=$2',
+        'insert into gha_payloads_pages(payload_id, sha) values($1, $2)'
+      ],
+      [
+        [plid, sha],
+        [plid, sha]
+      ]
+    )
+  end
 end
 
 # Are we interested in this org/repo ?
@@ -177,7 +334,7 @@ def threaded_parse(con, json, dt, forg, frepo)
       File.write ofn, prt 
     end
     write_to_pg(con, h) if $db_out
-    puts "Processed: '#{dt}' event: #{eid}" if $debug
+    puts "Processed: '#{dt}' event: #{eid}" if $debug >= 1
     f = 1
   end
   return f
@@ -231,6 +388,7 @@ def gha2pg(args)
     puts "Final threads join"
     thr_pool.each { |thr| thr.join }
   else
+    puts "Using single threaded version"
     while dt <= d_to
       get_gha_json(dt, org, repo)
       dt = dt + 3600
