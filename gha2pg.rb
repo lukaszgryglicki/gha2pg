@@ -316,8 +316,8 @@ def repo_hit(data, forg, frepo)
     return false
   end
   org, repo = *data.split('/')
-  return false unless forg == '' || org == forg
-  return false unless frepo == '' || repo == frepo
+  return false unless forg == '' || forg.include?(org)
+  return false unless frepo == '' || frepo.include?(repo)
   true
 end
 
@@ -369,9 +369,9 @@ end
 def gha2pg(args)
   d_from = parsed_time = DateTime.strptime("#{args[0]} #{args[1]}:00:00+00:00", '%Y-%m-%d %H:%M:%S%z').to_time
   d_to = parsed_time = DateTime.strptime("#{args[2]} #{args[3]}:00:00+00:00", '%Y-%m-%d %H:%M:%S%z').to_time
-  org = args[4] || ''
-  repo = args[5] || ''
-  puts "Running: #{d_from} - #{d_to} #{org}/#{repo}"
+  org = (args[4] || '').split(',').map(&:strip)
+  repo = (args[5] || '').split(',').map(&:strip)
+  puts "Running: #{d_from} - #{d_to} #{org.join('+')}/#{repo.join('+')}"
   dt = d_from
   if $thr_n > 1
     thr_pool = []
@@ -399,7 +399,7 @@ end
 
 # Required args
 if ARGV.length < 4
-  puts "Arguments required: date_from_YYYY-MM-DD hour_from_HH date_to_YYYY-MM-DD hour_to_HH [org [repo]]"
+  puts "Arguments required: date_from_YYYY-MM-DD hour_from_HH date_to_YYYY-MM-DD hour_to_HH ['org1,org2,...,orgN' ['repo1,repo2,...,repoN']]"
   exit 1
 end
 

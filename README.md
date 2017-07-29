@@ -14,8 +14,8 @@ Next two parameters are date to:
 - HH
 
 Both next two parameters are optional:
-- org (if given and non empty '' then only return JSONs matching given org)
-- repo (if given and non empty '' then only return JSONs matching given repo)
+- org (if given and non empty '' then only return JSONs matching given org). You can also provide a comma separated list of orgs here: 'org1,org2,org3'
+- repo (if given and non empty '' then only return JSONs matching given repo). You can also provide a comma separated list of repos here: 'repo1,repo2'
 
 You can filter only by org by passing for example 'kubernetes' for org and '' for repo or skipping repo.
 You can filter only by repo, You need to pass '' as org and then repo name.
@@ -112,6 +112,12 @@ Typical internal usage:
 
 There is also an internal tool: `analysis.rb`/`analysis.sh` to figure out how to create psql tables for gha.
 But this is only useful while developing this tool.
+
+# Running on Kubernetes
+
+Kubernetes consists of 3 different orgs, so to gather data for Kubernetes You need to provide them comma separated.
+like this (for June 2017):
+`time PG_PASS=pwd ./gha2pg.rb 2017-06-01 0 2017-07-01 0 'kubernetes,kubernetes-incubator,kubernetes-client'`
 
 
 # Future
