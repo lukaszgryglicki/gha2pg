@@ -31,6 +31,7 @@ def structure
   puts 'Connected'
   # gha_events
   # {"id:String"=>48592, "type:String"=>48592, "actor:Hash"=>48592, "repo:Hash"=>48592, "payload:Hash"=>48592, "public:TrueClass"=>48592, "created_at:String"=>48592, "org:Hash"=>19451}i#
+  # {"id"=>10, "type"=>29, "actor"=>278, "repo"=>290, "payload"=>216017, "public"=>4, "created_at"=>20, "org"=>230}
   c.exec('drop table if exists gha_events')
   c.exec(
     'create table gha_events(' +
@@ -46,12 +47,22 @@ def structure
   )
   # gha_actors
   # {"id:Fixnum"=>48592, "login:String"=>48592, "display_login:String"=>48592, "gravatar_id:String"=>48592, "url:String"=>48592, "avatar_url:String"=>48592}
+  # {"id"=>8, "login"=>34, "display_login"=>34, "gravatar_id"=>0, "url"=>63, "avatar_url"=>49}
   c.exec('drop table if exists gha_actors')
   c.exec(
     'create table gha_actors(' +
     'id bigint not null primary key, ' +
-    'login varchar(100) not null, ' +
-    'display_login varchar(100) not null' +
+    'login varchar(80) not null' +
+    ')'
+  )
+  # gha_repos
+  # {"id:Fixnum"=>48592, "name:String"=>48592, "url:String"=>48592}
+  # {"id"=>8, "name"=>111, "url"=>140}
+  c.exec('drop table if exists gha_repos')
+  c.exec(
+    'create table gha_repos(' +
+    'id bigint not null primary key, ' +
+    'name varchar(160) not null' +
     ')'
   )
 rescue PG::Error => e

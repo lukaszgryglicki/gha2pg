@@ -40,15 +40,7 @@ Once saved, You can review those JSONs manually (they''re pretty printed)
 # Mutithreading
 
 For example cncftest.io server has 48 CPU cores.
-
-Set those Ruby variables:
-```
-$thr_n = 4  # Number of threads to process separate hours in parallel
-$thr_m = 4  # Number of threads to process separate JSON events in parallel
-```
-If You have a powerful network, then prefer to put all CPU power to `$thr_n`.
-
-For example `$thr_n = 48`, `$thr_m = 1` - will be fastest with 48 CPUs/cores.
+It will just process 48 hours in parallel.
 
 # Results
 Usually there are about 40000 GitHub events in single hour.
