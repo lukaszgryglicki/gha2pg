@@ -28,6 +28,7 @@ You can tweak `gha2pg.rb` by:
 
 - Set `$db_out = true` if You want to put int PSQL DB.
 - Set `$json_out = true` to save output JSON files.
+- Set `$debug` to: 1: You will see events data being processed, 2: You will also see all DB queries.
 
 Examples in this shell script (some commented out, some not):
 `time PG_PASS=your_pass ./gha2pg.sh`
@@ -116,10 +117,13 @@ But this is only useful while developing this tool.
 # Running on Kubernetes
 
 Kubernetes consists of 3 different orgs, so to gather data for Kubernetes You need to provide them comma separated.
-like this (for June 2017):
+
+For example June 2017:
+
 `time PG_PASS=pwd ./gha2pg.rb 2017-06-01 0 2017-07-01 0 'kubernetes,kubernetes-incubator,kubernetes-client'`
 
 
 # Future
-Plan is to finish PostgreSQL database support and save matching JSONs there.
+- Plan is to finish PostgreSQL database support and save matching JSONs there.
+- Update analysis tool to recursivelly check Hash keys structure (without values) to see if they are the same in different event type's payloads.
 
