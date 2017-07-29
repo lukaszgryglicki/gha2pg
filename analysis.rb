@@ -3,6 +3,12 @@
 require 'json'
 require 'pry'
 
+# Outputs object structure (without data), to compare if different objects are representing similar data
+# s: output string
+# o: object
+# is: ignore scalars: true ==> will not output data types, false => will output values data type
+# md: max depth (recursion depth), 1 will only search top level fields, 2 will look in one level deeper etc
+# d: current depth (used automatically in recursion)
 def object_structure(s, o, is=false, md=nil, d=0)
   case o
   when Hash
@@ -53,6 +59,8 @@ def object_structure(s, o, is=false, md=nil, d=0)
   s
 end
 
+
+# Analysis of JSON data to determine PSQL tables to create
 def analysis(jsons)
   n = 0
   occ = {}

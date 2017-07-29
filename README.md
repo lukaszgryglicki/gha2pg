@@ -96,6 +96,8 @@ Running on all `kubernetes` repos for June 2017 yields:
 - Creates 4953 payload - commit connections.
 - Creates 30 payloads - pages connections.
 
+Running on all 3 kubernetes orgs (and my org 'lukaszgryglicki') for 1-29 July 2017 yields:
+
 
 # PostgreSQL database
 Setup:

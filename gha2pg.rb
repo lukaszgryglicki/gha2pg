@@ -44,6 +44,10 @@ def connect_db
     user: ENV['PG_USER'] || 'gha_admin',
     password: ENV['PG_PASS'] || 'password'
   ).tap do |con|
+    # this allowed to skip checking for PG::UniqueViolation
+    # But was a lot slower, it is better to detect very rare collisions and retry
+    # You can see in `process_table` - we're retrying only once and that is sufficient
+    # and happens very rare
     # con.exec 'set session characteristics as transaction isolation level repeatable read'
   end
 rescue PG::Error => e
@@ -62,7 +66,7 @@ end
 
 # Create prepared statement, bind args, execute and destroy statement
 # This is not creating transaction, but `process_table` calls it inside transaction
-# it is called without transaction on `gha_events` table but *ONLY* because each JSON in GHA
+# It is called without transaction on `gha_events` table but *ONLY* because each JSON in GHA
 # is a separate/unique GH event, so can be processed without concurency check at all
 def exec_stmt(con, sid, stmt, args)
   p [sid, stmt, args] if $debug >= 2
@@ -73,9 +77,10 @@ def exec_stmt(con, sid, stmt, args)
 end
 
 # Process 2 queries: 
-# 1st is select that checks if element exists in array
-# 2nd is executed when element is not present, and is inserting it
+# 1st is a select that checks if element exists in the table
+# 2nd is executed when row is not present, and is inserting it
 # In rare cases of unique key contraint violation, operation is restarted from beginning
+# This is faster than setting more strict transaction isolation level - checked on 48 CPU machine
 def process_table(con, sid, stmts, argss, retr=0)
   res = nil
   con.transaction do |con|
@@ -341,7 +346,7 @@ def threaded_parse(con, json, dt, forg, frepo)
 end
 
 # This is a work for single thread - 1 hour of GHA data
-# Usually such JSON conatin about 20000 - 50000 singe events
+# Usually such JSON conatin about 15000 - 60000 singe GHA events
 def get_gha_json(dt, forg, frepo)
   con = connect_db
   fn = dt.strftime('http://data.githubarchive.org/%Y-%m-%d-%k.json.gz').sub(' ', '')
